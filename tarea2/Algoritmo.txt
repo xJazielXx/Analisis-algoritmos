@@ -1,0 +1,135 @@
+import re 
+import ast
+
+class BigOAnalyzer:
+    def __init__(self):
+        # Valores iniciales por defecto
+        self.complexity = "O(1)"
+        self.max_nesting = 0
+        
+    def analyze_python(self, code):
+        """Analiza código Python contando la profundidad de los bucles."""
+        lines = code.split('\n')
+        max_loop_depth = 0 # Nivel máximo de anidamiento 
+        current_depth = 0  # Nivel de anidamiento en la línea actual
+        
+        for line in lines:
+            # Busca si la línea empieza con 'for ' (ignorando espacios iniciales)
+            if re.match(r'^\s*for\s+', line):
+                current_depth += 1
+                max_loop_depth = max(max_loop_depth, current_depth)
+            
+            # Aquí busca si la línea empieza con 'while '
+            elif re.match(r'^\s*while\s+', line):
+                current_depth += 1
+                max_loop_depth = max(max_loop_depth, current_depth)
+            
+            # Intento de detectar cuando un bloque termina
+            elif line.strip() and not line.startswith((' ', '\t')) and current_depth > 0:
+                current_depth = 0 # Resetea la profundidad si volvemos al margen izquierdo
+        
+       
+        if max_loop_depth == 0:
+            # Si no hay bucles, busca patrones de división
+            if re.search(r'bisect|binary|while.*//|while.*>>', code):
+                return "O(log n)"
+            # Busca si la función se llama a sí misma (recursión simple)
+            if re.search(r'def\s+\w+.*:\s*\n\s+.*\b\1\b', code):
+                return "O(2^n) o O(n!) - Revisar recursión"
+            return "O(1)" # Si no hay nada, es constante
+        
+        # Asigna O(n^profundidad)
+        elif max_loop_depth == 1:
+            return "O(n)"
+        elif max_loop_depth == 2:
+            return "O(n²)"
+        elif max_loop_depth == 3:
+            return "O(n³)"
+        else:
+            return f"O(n^{max_loop_depth})"
+    
+    def analyze_javascript(self, code):
+        """Analiza código JavaScript buscando palabras clave y llaves de cierre."""
+        lines = code.split('\n')
+        max_loop_depth = 0
+        current_depth = 0
+        
+        # Palabras que suelen implicar iteración en JS
+        loop_keywords = ['for', 'while', 'map', 'forEach', 'filter', 'reduce']
+        
+        for line in lines:
+            for keyword in loop_keywords:
+                # Busca la palabra seguida de un paréntesis
+                if re.match(rf'^\s*{keyword}\s*[\(]', line):
+                    current_depth += 1
+                    max_loop_depth = max(max_loop_depth, current_depth)
+                    break # Deja de buscar otras keywords en la misma línea
+            
+          
+            if '}' in line and current_depth > 0:
+                current_depth -= 1
+        
+   
+        if max_loop_depth == 0: return "O(1)"
+        elif max_loop_depth == 1: return "O(n)"
+        elif max_loop_depth == 2: return "O(n²)"
+        else: return f"O(n^{max_loop_depth})"
+    
+    def analyze_java(self, code):
+       
+        return self.analyze_javascript(code)
+    
+    def analyze(self, code, language='python'):
+             analyzers = {
+            'python': self.analyze_python,
+            'javascript': self.analyze_javascript,
+            'js': self.analyze_javascript,
+            'java': self.analyze_java
+        }
+        
+              analyzer = analyzers.get(language.lower(), self.analyze_python)
+        result = analyzer(code)
+        
+     
+        return {
+            'complexity': result,
+            'recommendations': self._get_recommendations(result)
+        }
+    
+    def _get_recommendations(self, complexity):
+               recommendations = {
+            'O(1)': ' Excelente. Operación constante.',
+            'O(log n)': ' Muy eficiente. Algoritmo de división.',
+            'O(n)': ' Eficiente. Complejidad lineal.',
+            'O(n log n)': ' Aceptable. Normal en ordenamientos.',
+            'O(n²)': ' Podría optimizarse para grandes entradas.',
+            'O(n³)': ' Busca alternativas más eficientes.',
+            'O(2^n)': ' Solo funciona para entradas muy pequeñas.'
+        }
+        
+        # Busca si la clave de complejidad está contenida en el resultado
+        for key, msg in recommendations.items():
+            if key in complexity:
+                return msg
+        return ' Revisa manualmente la complejidad.'
+
+
+
+if __name__ == "__main__":
+    analyzer = BigOAnalyzer()
+    
+   
+ 
+
+    code_python = """
+def ejemplo_busqueda(arr, target):
+    for i in range(len(arr)):
+        for j in range(len(arr)):
+            if arr[i][j] == target:
+                return True
+    return False
+"""
+    
+    result = analyzer.analyze(code_python, 'python')
+    print(f"Complejidad: {result['complexity']}")
+    print(f"Recomendación: {result['recommendations']}")
