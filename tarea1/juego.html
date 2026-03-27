@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Mini Runner</title>
+  <style>
+    body {
+      background: white;
+      font-family: Arial, sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 20px;
+    }
+    h2 { margin-bottom: 10px; }
+    canvas {
+      border: 2px solid black;
+      background: #eef;
+    }
+    p { margin-top: 10px; font-size: 14px; color: #333; }
+  </style>
+</head>
+<body>
+
+<h2>Mini Runner</h2>
+<canvas id="canvas" width="600" height="150"></canvas>
+<p id="msg">Presiona ESPACIO para empezar / saltar &nbsp;|&nbsp; S para agacharse</p>
+
+<script>
+  const canvas = document.getElementById('canvas');
+  const ctx = canvas.getContext('2d');
+
+  const SUELO = 100;
+  let jugando = false;
+  let gameOver = false;
+  let score = 0;
+  let hiScore = 0;
+  let velocidad = 4;
+  let frame = 0;
+
+  const jugador = {
+    x: 60,
+    y: SUELO,
+    w: 20,
+    h: 30,
+    vy: 0,
+    enSuelo: true,
+    agachado: false
+  };
+
+  let obstaculos = [];
+  let timer = 0;
+
+  function resetear() {
+    jugador.y = SUELO;
+    jugador.vy = 0;
+    jugador.enSuelo = true;
+    jugador.agachado = false;
+    jugador.h = 30;
+    obstaculos = [];
+    score = 0;
+    velocidad = 4;
+    frame = 0;
+    timer = 0;
+  }
+
+  function saltar() {
+    if (!jugando || gameOver) {
+      resetear();
+      jugando = true;
+      gameOver = false;
+      return;
+    }
+    if (jugador.enSuelo && !jugador.agachado) {
+      jugador.vy = -12;
+      jugador.enSuelo = false;
+    }
+  }
+
+  function agachar(val) {
+    if (!jugando) return;
+    jugador.agachado = val;
+    if (val) {
+      jugador.h = 15;
+      if (jugador.enSuelo) jugador.y = SUELO + 15;
+    } else {
+      jugador.h = 30;
+      if (jugador.enSuelo) jugador.y = SUELO;
+    }
+  }
+
+  function spawnObstaculo() {
+    const tipo = Math.random() < 0.3 ? 'pajaro' : 'cactus';
+    if (tipo === 'cactus') {
+      const h = 20 + Math.floor(Math.random() * 20);
+      obstaculos.push({ tipo, x: 620, y: SUELO + 30 - h, w: 15, h });
+    } else {
+      const yVuelo = Math.random() < 0.5 ? SUELO - 10 : SUELO + 8;
+      obstaculos.push({ tipo, x: 620, y: yVuelo, w: 25, h: 15 });
+    }
+  }
+
+  function colision() {
+    for (const o of obstaculos) {
+      const jx = jugador.x - jugador.w / 2 + 3;
+      const jy = jugador.y + 3;
+      const jw = jugador.w - 6;
+      const jh = jugador.h - 3;
+      if (jx < o.x + o.w && jx + jw > o.x && jy < o.y + o.h && jy + jh > o.y) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  function dibujar() {
+    ctx.clearRect(0, 0, 600, 150);
+
+    // suelo
+    ctx.strokeStyle = 'black';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(0, SUELO + 30);
+    ctx.lineTo(600, SUELO + 30);
+    ctx.stroke();
+
+    // jugador
+    ctx.fillStyle = 'blue';
+    ctx.fillRect(jugador.x - jugador.w / 2, jugador.y, jugador.w, jugador.h);
+
+    // ojo
+    ctx.fillStyle = 'white';
+    ctx.fillRect(jugador.x + 2, jugador.y + 5, 6, 6);
+    ctx.fillStyle = 'black';
+    ctx.fillRect(jugador.x + 4, jugador.y + 7, 3, 3);
+
+    // piernas
+    if (jugador.enSuelo && !jugador.agachado) {
+      const p = Math.sin(frame * 0.3) > 0 ? 1 : -1;
+      ctx.fillStyle = 'blue';
+      ctx.fillRect(jugador.x - 8, jugador.y + jugador.h, 7, 8 + p * 3);
+      ctx.fillRect(jugador.x + 2, jugador.y + jugador.h, 7, 8 - p * 3);
+    }
+
+    // obstaculos
+    obstaculos.forEach(o => {
+      if (o.tipo === 'cactus') {
+        ctx.fillStyle = 'green';
+        ctx.fillRect(o.x, o.y, o.w, o.h);
+        ctx.fillRect(o.x - 6, o.y + 6, 7, 4);
+        ctx.fillRect(o.x + o.w, o.y + 8, 7, 4);
+      } else {
+        ctx.fillStyle = 'red';
+        ctx.fillRect(o.x, o.y, o.w, o.h);
+        ctx.fillStyle = 'darkred';
+        ctx.fillRect(o.x + 5, o.y - 5, 15, 6);
+      }
+    });
+
+    // score
+    ctx.fillStyle = 'black';
+    ctx.font = '13px Arial';
+    ctx.fillText('Score: ' + Math.floor(score), 10, 20);
+    ctx.fillText('Mejor: ' + Math.floor(hiScore), 10, 38);
+
+    if (!jugando && !gameOver) {
+      ctx.font = '16px Arial';
+      ctx.textAlign = 'center';
+      ctx.fillText('Presiona ESPACIO para empezar', 300, 75);
+      ctx.textAlign = 'left';
+    }
+
+    if (gameOver) {
+      ctx.fillStyle = 'rgba(0,0,0,0.4)';
+      ctx.fillRect(0, 0, 600, 150);
+      ctx.fillStyle = 'red';
+      ctx.font = 'bold 20px Arial';
+      ctx.textAlign = 'center';
+      ctx.fillText('GAME OVER', 300, 65);
+      ctx.fillStyle = 'white';
+      ctx.font = '12px Arial';
+      ctx.fillText('Presiona ESPACIO para reintentar', 300, 90);
+      ctx.textAlign = 'left';
+    }
+  }
+
+  function loop() {
+    if (jugando && !gameOver) {
+      frame++;
+      score += 0.08;
+      velocidad = 4 + Math.floor(score / 150) * 0.5;
+
+      // gravedad
+      if (!jugador.enSuelo) {
+        jugador.vy += 0.6;
+        jugador.y += jugador.vy;
+        const suelo = jugador.agachado ? SUELO + 15 : SUELO;
+        if (jugador.y >= suelo) {
+          jugador.y = suelo;
+          jugador.vy = 0;
+          jugador.enSuelo = true;
+        }
+      }
+
+      // spawn obstaculos
+      timer++;
+      if (timer >= Math.max(50, 85 - Math.floor(score / 100) * 3)) {
+        spawnObstaculo();
+        timer = 0;
+      }
+
+      obstaculos.forEach(o => o.x -= velocidad);
+      obstaculos = obstaculos.filter(o => o.x > -40);
+
+      if (colision()) {
+        gameOver = true;
+        if (score > hiScore) hiScore = score;
+      }
+    }
+
+    dibujar();
+    requestAnimationFrame(loop);
+  }
+
+  document.addEventListener('keydown', e => {
+    if (e.code === 'Space') { e.preventDefault(); saltar(); }
+    if (e.key === 's' || e.key === 'S' || e.key === 'ArrowDown') agachar(true);
+  });
+  document.addEventListener('keyup', e => {
+    if (e.key === 's' || e.key === 'S' || e.key === 'ArrowDown') agachar(false);
+  });
+  canvas.addEventListener('click', saltar);
+
+  loop();
+</script>
+
+</body>
+</html>
